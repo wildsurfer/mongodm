@@ -12,7 +12,7 @@ abstract class PhactoryTestCase extends \PHPUnit_Framework_TestCase
 {
   protected static $db;
   protected static $phactory;
- 
+
   public static function setUpBeforeClass()
   {
     MongoDB::setConfigBlock('testing', array(
@@ -21,13 +21,15 @@ abstract class PhactoryTestCase extends \PHPUnit_Framework_TestCase
         'database'  => 'test_db'
       )
     ));
-    MongoDB::instance('testing')->connect();
 
-    if(!self::$db) {
-      self::$db = MongoDB::instance('testing');
-    }
+    self::$db = MongoDB::instance('testing');
+    self::$db->connect();
 
-    if(!self::$phactory) {
+    if (!self::$phactory) {
+      if (!self::$db->getDB() instanceof \MongoDB) {
+        throw new \Exception('Could not connect to MongoDB');
+      }
+      
       self::$phactory = new Phactory(self::$db->getDB());
       self::$phactory->reset();
     }
@@ -35,18 +37,18 @@ abstract class PhactoryTestCase extends \PHPUnit_Framework_TestCase
     //set up Phactory db connection
     self::$phactory->reset();
   }
- 
+
   public static function tearDownAfterClass()
   {
-    foreach(self::$db->getDB()->getCollectionNames() as $collection) {
+    foreach (self::$db->getDB()->getCollectionNames() as $collection) {
       self::$db->getDB()->$collection->drop();
     }
   }
- 
+
   protected function setUp()
   {
   }
- 
+
   protected function tearDown()
   {
     self::$phactory->recall();

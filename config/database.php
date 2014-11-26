@@ -1,15 +1,17 @@
 <?php
 
-/**  Determine if use your local config file in place of this file   **/
-$use_local_config = true;
-
 /** The path of your config file , change to fit for your project.
  * 	If your local config file does not exist,this config file will be used.
  * **/
-$local_config_file = __DIR__."/../../../../application/config/mongodm.php";
 
-if($use_local_config && file_exists($local_config_file)){
-    $array = require $local_config_file;
+if(defined('MONGODM_CONFIG')){
+    $local_config_file = MONGODM_CONFIG;
+}else{
+    $local_config_file = __DIR__."/../../../../application/config/mongodm.php";
+}
+
+if (file_exists($local_config_file)) {
+    $array = require($local_config_file);
     return $array;
 }
 
@@ -23,32 +25,31 @@ if($use_local_config && file_exists($local_config_file)){
 return array(
 
    /* Configuration section name*/
-	'default' => array(
-		'connection' => array(
-			'hostnames' => 'localhost',
-			'database'  => 'default',
+    'default' => array(
+        'connection' => array(
+            'hostnames' => '127.0.0.1',
+            'database'  => 'default',
 // 			'username'  => ''
 // 			'password'  => ''
-		)
-	),
-	'development' => array(
-		'connection' => array(
-			'hostnames' => 'localhost',
-			'database'  => 'development_db'
-		)
-	),
-	'testing' => array(
-		'connection' => array(
-			'hostnames' => 'localhost',
-//          'hostnames' => 'localhost,192.168.1.2',
-			'database'  => 'test_db'
-		)
-	),
-	'production' => array(
+        )
+    ),
+    'development' => array(
         'connection' => array(
-            'hostnames' => 'localhost',
+            'hostnames' => '127.0.0.1',
+            'database'  => 'development_db'
+        )
+    ),
+    'testing' => array(
+        'connection' => array(
+            'hostnames' => '127.0.0.1',
+//          'hostnames' => 'localhost,192.168.1.2',
+            'database'  => 'test_db'
+        )
+    ),
+    'production' => array(
+        'connection' => array(
+            'hostnames' => '127.0.0.1',
             'database'  => 'production_db'
         )
-	)
+    )
 );
-

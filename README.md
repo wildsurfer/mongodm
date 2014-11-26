@@ -1,8 +1,38 @@
-Mongodm  
+![image](http://blog.missyi.com/wp-content/uploads/2014/09/mongodm.png)
 ======= 
-[![Build Status](https://secure.travis-ci.org/purekid/mongodm.png?branch=master)](http://travis-ci.org/purekid/mongodm)
 
-a PHP MongoDB ORM ,  simple and flexible
+[![SensioLabsInsight](https://insight.sensiolabs.com/projects/a6ae6cc6-fe3a-4cb8-85af-86529a0cb4c2/mini.png)](https://insight.sensiolabs.com/projects/a6ae6cc6-fe3a-4cb8-85af-86529a0cb4c2)
+[![Build Status](https://secure.travis-ci.org/purekid/mongodm.png?branch=master)](http://travis-ci.org/purekid/mongodm)
+[![Latest Stable Version](https://poser.pugx.org/purekid/mongodm/v/stable.png)](https://packagist.org/packages/purekid/mongodm) [![Total Downloads](https://poser.pugx.org/purekid/mongodm/downloads.png)](https://packagist.org/packages/purekid/mongodm) [![License](https://poser.pugx.org/purekid/mongodm/license.png)](https://packagist.org/packages/purekid/mongodm)
+
+- [Introduction](#introduction)
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Setup Database](#setup-database)
+- [Basic Usage - CRUD](#model-crud)
+- [Relationship - Reference](#relationship---reference)
+- [Relationship - Embed](#relationship---embed)
+- [Collection](#collection)
+- [Inheritance](#inheritance)
+- [Other methods](#other-static-methods-in-model)
+- [Model Hooks](#model-hooks)
+- [Special Thanks](#special-thanks-to)
+
+
+Introduction
+------------
+Mongodm is a MongoDB ORM that includes support for references,embed and even multilevel inheritance.
+
+Features
+--------
+
+- ORM
+- Simple and flexible
+- Support for embed 
+- Support for references (lazy loaded)
+- Support for multilevel inheritance
+- Support for local collection operations
 
 Requirements
 ------------
@@ -10,37 +40,29 @@ Requirements
 - Mongodb 1.3 or greater
 - PHP Mongo extension 
 
-Features
---------
-
-- ORM
-- Simple and flexible
-- Support for references (lazy loaded)
-- Support for multilevel inheritance
-
 Installation
 ----------
 
 ### 1. Setup in composer.json: 
- 
+```yml
 	{
 		"require": {
 		    "purekid/mongodm": "dev-master"
 		}
 	}
-
+```
 
 ### 2. Install by composer:
 
-	php composer.phar install
+	$ php composer.phar update
+		
 
-
-Usage
+Setup Database
 ----------
 
-### Setup database in   config/database.php
-If you want select config section with environment variable APPLICATION_ENV , you should set $config='default' or don't declare $config in your own model class.
+Database config file  (By default it locates at /vendor/purekid/mongodm/config.php)
 
+```php
 	return array(
         'default' => array(
     		'connection' => array(
@@ -50,31 +72,66 @@ If you want select config section with environment variable APPLICATION_ENV , yo
     // 			'password'  => '',
     		)
     	),
-    	'development' => array(
-    		'connection' => array(
-    			'hostnames' => 'localhost',
-    			'database'  => 'development'
-    		)
-    	),
-    	'testing' => array(
-    		'connection' => array(
-    			'hostnames' => 'localhost',
-    			'database'  => 'test'
-    		)
-    	),
     	'production' => array(
     		'connection' => array(
     			'hostnames' => 'localhost',
-    			'database'  => 'production'
+    			'database'  => 'production',
+    			'options' => array('replicaSet' => 'rs0')
     		)
     	)
     );
+```
 
-### Define a model and enjoy it
+### Setup database in application
 
-    use Purekid\Mongodm\Model;
-        
-    class User extends Model 
+1.You can set up configuration using the `MongoDB::setConfigBlock` method.
+
+```php
+
+\Purekid\Mongodm\MongoDB::setConfigBlock('default', array(
+    'connection' => array(
+        'hostnames' => 'localhost',
+        'database'  => 'default',
+        'options'  => array()
+    )
+));
+
+// 
+\Purekid\Mongodm\MongoDB::setConfigBlock('auth', array(
+    'connection' => array(
+        'hostnames' => 'localhost',
+        'database'  => 'authDB',
+        'options'  => array()
+    )
+));
+
+```
+
+2.Or you can duplicate a config file into your project, then define a global constanct 'MONGODM_CONFIG' with it's location.
+
+```php
+
+//in a global initialization place
+
+define('MONGODM_CONFIG',__DIR__."/../config/mongodm.php");
+
+```
+
+### Choose config section with APPLICATION_ENV
+
+Which config section Mongodm use ? Mongodm choose 'default' section by default.
+
+You have two ways to specify section :
+
+1.'$config' attribute in Model , you can find this attribute in example below.
+
+2.With environment constanct 'APPLICATION_ENV' ,this constanct can be set by webserver,your code or shell environment.  In this case,you should set $config='default' or don't declare $config in your own model class.
+
+
+### Create a model and enjoy it
+
+```php       
+    class User extends \Purekid\Mongodm\Model 
     {
     
         static $collection = "user";
@@ -94,86 +151,159 @@ If you want select config section with environment variable APPLICATION_ENV , yo
             'money' => array('default'=>20.0,'type'=>'double'),
             'hobbies' => array('default'=>array('love'),'type'=>'array'),
             'born_time' => array('type'=>'timestamp'),
-            'family'=>array('type'=>'object')
+            'family'=>array('type'=>'object'),
+            'pet_fav' => array('model'=>'Purekid\Mongodm\Test\Model\Pet','type'=>'embed'),
+            'pets' => array('model'=>'Purekid\Mongodm\Test\Model\Pet','type'=>'embeds'),
                 
         );
+
+        public function setFirstName($name) {
+        	$name = ucfirst(strtolower($name));
+        	$this->__setter('firstName', $name);
+        }
+
+        public function getLastName($name) {
+        	$name = $this->__getter('name');
+        	return strtoupper($name);
+        }
     
     }
-    
-Types Supported for model attr
-----------   
+```    
 
+### Types supported for model attributes
+
+```php
 	$types = [
 	    'mixed',  // mixed type 
 	    'string',     
-	    'reference',  // a reference to another model
-	    'references', // references to another model
+	    'reference',  // 1 ： 1 reference
+	    'references', // 1 ： many references
+	    'embed', 
+	    'embeds', 
 	    'integer',  
 	    'int',  // alias of 'integer'
 	    'double',     // float 
 	    'timestamp',  // store as MongoTimestamp in Mongodb
+	    'date',  // store as DateTime
 	    'boolean',    // true or false
 	    'array',    
 	    'object'
 	]
+```
 
-CRUD
+If you put a object instance into a Model attribute and this attribute is undefined in $attrs of Model class,the data of attribute will be omitted when Model saving.
+
+```php
+    
+    $object = new \stdClass();  
+    $object->name = 'ooobject';
+    
+    $user = new User();
+    $user->name = 'michael';
+    $user->myobject = $object;    // this attribute will be omitted when saving to DB 
+    $user->save();
+
+```
+
+Model CRUD
 ---------- 
 
 ### Create 
+```php  
 	$user = new User();
 	$user->name = "Michael";
 	$user->age = 18;
 	$user->save();
-    
+``` 
 Create with initial value
-
+```php  
 	$user = new User( array('name'=>"John") );
 	$user->age = 20;
 	$user->save();
+```
+
+Create using set method
+```php
+	$user->setLastName('Jones'); // Alias of $user->lastName = 'Jones';
+	$user->setFirstName('John'); // Implements setFirstName() method
+```
+
+#### Set and get values
+You can set/get values via variable `$user->name = "John"` or by method `$user->getName()`.
+
+Set using variable or method
+```php
+ 	// no "set" method exists
+	$user->lastName = 'Jones';
+	$user->setLastName('Jones');
+
+	// "set" method exists implements setFirstName()
+	$user->firstName = 'jOhn'; // "John"
+	$user->setFirstName('jOhn'); // "John"
+```
+
+Get using variable or method
+```php
+ 	// "get" method exists implements getLastName()
+	print $user->lastName; // "JONES"
+	print $user->getLastName(); // "JONES"
+
+	// no "get" method
+	print $user->firstName; // "John"
+	print $user->setFirstName('John'); // "John"
+```
 
 ### Update
+```php  
 	$user->age = 19;
-
-Update attrs by array
-
+```
+Update attributes by array
+```php  
 	$user->update( array('age'=>18,'hobbies'=>array('music','game') ) ); 
 	$user->save();
-
+```
+Unset attributes
+```php  	
+	$user->unset('age');
+	$user->unset( array('age','hobbies') );
+	//or
+	unset($user->age);
+```
 ### Retrieve single record
-
+```php  
 	$user = User::one( array('name'=>"michael" ) );
-	
+```	
 retrieve one record by MongoId
-
+```php  
 	$id = "517c850641da6da0ab000004";
-
 	$id = new \MongoId('517c850641da6da0ab000004'); //another way
 	$user = User::id( $id );
-	
+```	
 ### Retrieve records
 
 Retrieve records that name is 'Michael' and acount  of owned  books equals 2
-
+```php  
 	$params = array( 'name'=>'Michael','books'=>array('$size'=>2) );
 	$users = User::find($params);     // $users is instance of Collection
 	echo $users->count();
-       
+```      
 ### Retrieve all records
+```php  
 	$users = User::all();
-	
+```	
 ### Count records
+```php  
 	$count = User::count(array('age'=>16));
-
+```
 ### Delete record
+```php  
 	$user = User::one();
 	$user->delete();	
-	
-
-Relationship
+```	
+Relationship - Reference
 ---------- 
 ### Lazyload a 1:1 relationship record
-
+```php  
 	$book = new Book();
 	$book->name = "My Love";
 	$book->price = 15;
@@ -186,10 +316,11 @@ Relationship
 	// now you can do this
 	$user = User::one( array('name'=>"michael" ) );
 	echo $user->book_fav->name;
-
+```
 ### Lazyload 1:many relationship records
-
+```php  
 	$user = User::one();
+	$id = $user->getId();
 
 	$book1 = new Book();
 	$book1->name = "book1";
@@ -207,20 +338,65 @@ Relationship
 	//somewhere , load these books
 	$user = User::id($id);
 	$books = $user->books;      // $books is a instance of Collection
+```
+Relationship - Embed
+---------- 
 
+### Single Embed 
+```php  
+	$pet = new Pet();
+	$pet->name = "putty";
+
+	$user->pet_fav = $pet;
+	$user->save();
+
+	// now you can do this
+	$user = User::one( array('name'=>"michael" ) );
+	echo $user->pet_fav->name;
+```
+### Embeds
+```php  
+	$user = User::one();
+	$id = $user->getId();
+	
+	$pet_dog = new Pet();
+	$pet_dog->name = "puppy";
+	$pet_dog->save();
+	
+	$pet_cat = new Pet();
+	$pet_cat->name = "kitty";
+	$pet_cat->save();
+
+	$user->pets = array($pet_cat,$pet_dog);
+	//also you can
+	$user->pets = Collection::make(array($pet_cat,$pet_dog));
+	$user->save();
+
+	$user = User::id($id);
+	$pets = $user->pets;     
+```
 ###  Collection 
 
 $users is instance of Collection
-
+```php  
 	$users = User::find(  array( 'name'=>'Michael','books'=>array('$size'=>2) ) );    
 	$users_other = User::find(  array( 'name'=>'John','books'=>array('$size'=>2) ) );   
-	
+```	
+Save
+```php
+    $users->save() ;  // foreach($users as $user) { $user->save(); }
+```
+Delete
+```php
+    $users->delete() ;  // foreach($users as $user) { $user->delete(); }
+```
 Count 
-
+```php  
 	$users->count();  
-	
+	$users->isEmpty();
+```	
 Iteration	
-
+```php  
 	foreach($users as $user) { }  
 	
 	// OR use Closure 
@@ -228,9 +404,9 @@ Iteration
 	$users->each(function($user){
 	
 	})
-	
+```	
 Sort
-
+```php  
 	//sort by age desc
 	$users->sortBy(function($user){
 	    return $user->age;
@@ -243,22 +419,26 @@ Sort
 	
 	//reverse collection items
 	$users->reverse();
-	
+```
+Slice and Take
+```php  	
+	$users->slice(0,1);
+	$users->take(2);
+```	
 Map
-	
+```php  	
 	$func = function($user){
 		  		if( $user->age >= 18 ){
 		    		$user->is_adult = true;
-		    		return $user;
 	        	}
+	            return $user;
 			};
 	
-	$adults = $users->map($func);   
+	$users->map($func)->save();   
 	
-	// Notice:  1. $adults is a new collection   2. In original $users , data has changed at the same time. 
-	
+```	
 Filter 
-
+```php  
 	$func = function($user){
 	        	if( $user->age >= 18 ){
 	    			return true;
@@ -266,65 +446,65 @@ Filter
 			}
 
 	$adults = $users->filter($func); // $adults is a new collection
-
+```
 Determine a record exists in the collection by object instance	
-	
+```php  	
 	$john = User::one(array("name"=>"John"));
 	
 	$users->has($john) 
-
+```
 Determine a record exists in the collection by numeric index	
-
+```php  
 	$users->has(0) 
-	
+```	
 Determine a record exists in the collection by MongoID	
-
+```php  
 	$users->has('518c6a242d12d3db0c000007') 
-
+```
 Get a record by numeric index
-
+```php  
 	$users->get(0) 
-
+```
 Get a record by MongoID 
-
+```php  
 	$users->get('518c6a242d12d3db0c000007') 
-
+```
 Remove a record by numeric index
-
+```php  
 	$users->remove(0)  
-
+```
 Remove a record  by MongoID
-
+```php  
 	$users->remove('518c6a242d12d3db0c000007') 
-	
+```	
 Add a single record to collection
-
+```php  
 	$bob = new User( array("name"=>"Bob"));
 	$bob->save();
 	$users->add($bob);
-	
+```	
 Add records to collection
-	
+```php  	
 	$bob = new User( array("name"=>"Bob"));
 	$bob->save();
 	$lisa = new User( array("name"=>"Lisa"));
 	$lisa->save();
 	
 	$users->add( array($bob,$lisa) ); 
-	
+```	
 Merge two collection 
-	
+```php  	
 	$users->add($users_other);  // the collection $users_other appends to end of $users 
-	
+```
 Export data to a array
-
+```php  
 	$users->toArray();
-	
+```	
 Inheritance
 ----------
 	
 ### Define multilevel inheritable models:
-
+```php  
 	use Purekid\Mongodm\Model;
 	namespace Demo;
 	
@@ -351,9 +531,9 @@ Inheritance
 		)
 		
 	}
-	
+```	
 ### Use:
-
+```php  
 	$bob = new Student( array('name'=>'Bob','age'=> 17 ,'gender'=>'male' ) );
 	$bob->save();
 	
@@ -373,9 +553,9 @@ Inheritance
 	$bob->mum = $lisa;
 	$bob->classmates = array( $john, $lily );
 	$bob->save();
-	
+```	
 ### Retrieve and check value:
-
+```php  
 	$bob = Student::one( array("name"=>"Bob") );
 	
 	echo $bob->dad->name;    // David
@@ -385,27 +565,42 @@ Inheritance
 	echo $classmates->count(); // 2
     
 	var_dump($classmates->get(0)); // john	
-	
+```	
 
 ### Retrieve subclass
 
 Retrieve all Human records , queries without '_type' because of it's a toplevel class.
-	
+```php  	
     $humans = Human::all();
-    
+``` 
 Retrieve all Student records , queries with  { "_type":"Student" } because of it's a subclass.
-
+```php  
     $students = Student::all();
+```
 
+### Retrieve subclass _without_ `_type`
 
-### Other static methods 
+To retrieve a record without the `_type` criteria (i.e. `{ "_type":"Student" }`) set:
 
-Drop the collection in database
+```php
+class Student extends \Purekid\Mongodm\Model
+{
+    protected static $useType = false;
 
-##### drop()
+    protected static $collection = 'Student';
+}
+```
 
-### Hooks
+_Make sure to set a collection otherwise you will get results with every `_type`._
 
+Other static methods in Model
+----------
+```php
+	User::drop() // Drop collection 
+	User::ensureIndex()  // Add index for collection
+```
+Model Hooks
+----------
 The following hooks are available:
 
 ##### __init()
